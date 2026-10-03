@@ -23,7 +23,6 @@ try {
     $executed = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
     $allFiles = scandir(__DIR__) ?: [];
-    echo "Found " . count($allFiles) . " directory entries in " . __DIR__ . ": " . implode(', ', $allFiles) . "\n";
     $files = [];
     foreach ($allFiles as $f) {
         if (str_ends_with(strtolower($f), '.sql')) {
