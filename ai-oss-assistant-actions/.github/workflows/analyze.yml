@@ -1,0 +1,72 @@
+name: Analyze Repo
+on:
+  workflow_dispatch:
+    inputs:
+      repo_full_name: { required: true, type: string }
+      fork_url: { required: true, type: string }
+      repo_id: { required: true, type: string }
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.fork_url }}
+
+      - name: Classify Repository Files
+        run: python3 scripts/classify-repo-files.py .
+
+      - name: Parse Documented Build/Test Instructions
+        run: python3 scripts/parse-documented-instructions.py .
+
+      - name: Resolve DevContainer environment
+        run: bash scripts/detect-environment.sh
+
+      - name: DevContainer Baseline Test Run
+        uses: devcontainers/ci@v0.3
+        with:
+          runCmd: |
+            python3 scripts/parse-documented-instructions.py .
+            CMD=$(jq -r '.commands.test // "npm test"' build-test-instructions.json)
+            eval "$CMD" || true
+
+      - name: Static Analysis — Semgrep
+        run: |
+          docker run --rm -v "$PWD:/src" semgrep/semgrep semgrep --config auto --json > semgrep.json || true
+
+      - name: Dependency Vulnerability Scanning — Trivy
+        run: |
+          docker run --rm -v "$PWD:/src" aquasec/trivy fs --format json /src > trivy.json || true
+
+      - name: Secret Leak Detection — Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/src" zricethezav/gitleaks detect --report-format json --report-path gitleaks.json || true
+
+      - name: Merge Findings to Compact Summary
+        env:
+          REPO_ID: ${{ inputs.repo_id }}
+        run: python3 scripts/merge-scan-results.py
+
+      - name: Upload Raw Scanner Output as Artifacts (Not stored in MySQL)
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-scan-logs
+          path: |
+            repo-file-manifest.json
+            build-test-instructions.json
+            semgrep.json
+            trivy.json
+            gitleaks.json
+
+      - name: HMAC Sign and Webhook POST back to Backend
+        env:
+          WEBHOOK_SECRET: ${{ secrets.BACKEND_WEBHOOK_SECRET }}
+          WEBHOOK_URL: ${{ secrets.BACKEND_WEBHOOK_URL }}
+        run: |
+          SIG=$(openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" merged-findings.json | awk '{print $2}')
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$SIG" \
+            -d @merged-findings.json

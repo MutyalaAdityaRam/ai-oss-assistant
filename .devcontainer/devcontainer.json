@@ -1,0 +1,31 @@
+{
+  "name": "AI OSS Assistant",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.extend.yml"
+  ],
+  "service": "backend",
+  "workspaceFolder": "/var/www/html",
+  "forwardPorts": [8000, 3000, 3306, 8080],
+  "postCreateCommand": "composer install --no-interaction",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bmewburn.vscode-intelephense-client",
+        "recca0120.vscode-phpunit",
+        "xdebug.php-debug",
+        "esbenp.prettier-vscode",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-mysql"
+      ],
+      "settings": {
+        "php.validate.executablePath": "/usr/local/bin/php",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "bmewburn.vscode-intelephense-client",
+        "[php]": {
+          "editor.defaultFormatter": "bmewburn.vscode-intelephense-client"
+        }
+      }
+    }
+  }
+}

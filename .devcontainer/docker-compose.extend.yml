@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  backend:
+    # Dev-only overrides for the backend container
+    environment:
+      - PHP_XDEBUG_MODE=debug,develop
+      - PHP_XDEBUG_CLIENT_HOST=host.docker.internal
+      - PHP_XDEBUG_CLIENT_PORT=9003
+      - APP_ENV=development
+      - APP_DEBUG=true
+    volumes:
+      # Mount the Xdebug config if it exists
+      - ./xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini:ro

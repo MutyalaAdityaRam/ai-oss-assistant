@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # ── PHP Backend (Apache) ───────────────────────────────────
+  backend:
+    build:
+      context: ./ai-oss-assistant-backend
+      dockerfile: Dockerfile
+    container_name: ai-oss-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:80"
+    volumes:
+      - ./ai-oss-assistant-backend:/var/www/html
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${MYSQL_DATABASE:-ai_oss_assistant}
+      - DB_USER=${MYSQL_USER:-ai_oss_user}
+      - DB_PASS=${MYSQL_PASSWORD:-ai_oss_password_change_me}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # ── MySQL 8.0 ─────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: ai-oss-db
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_password_change_me}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-ai_oss_assistant}
+      - MYSQL_USER=${MYSQL_USER:-ai_oss_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-ai_oss_password_change_me}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # ── Next.js Frontend ──────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: ai-oss-frontend
+    working_dir: /app
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./ai-oss-assistant-frontend:/app
+      - frontend-node-modules:/app/node_modules
+    command: sh -c "npm install && npm run dev"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:${BACKEND_PORT:-8000}
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # ── phpMyAdmin (optional, for DB inspection) ──────────────
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: ai-oss-phpmyadmin
+    ports:
+      - "${PHPMYADMIN_PORT:-8080}:80"
+    environment:
+      - PMA_HOST=db
+      - PMA_USER=${MYSQL_USER:-ai_oss_user}
+      - PMA_PASSWORD=${MYSQL_PASSWORD:-ai_oss_password_change_me}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    profiles:
+      - tools
+
+volumes:
+  mysql-data:
+    driver: local
+  frontend-node-modules:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

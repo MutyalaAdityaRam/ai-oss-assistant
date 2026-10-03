@@ -1,0 +1,23 @@
+# Environment & Configuration Files
+.env
+.env.*
+!.env.example
+
+# Composer Dependencies
+/vendor/
+
+# Logs & Temporary Data
+*.log
+/logs/
+/tmp/
+/scratch/
+
+# OS & Editor Artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# PHPUnit & Testing Caches
+.phpunit.result.cache
+/coverage/

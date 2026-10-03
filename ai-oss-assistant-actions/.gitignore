@@ -1,0 +1,21 @@
+# Temporary Scan Outputs & Artifacts
+*.json
+!merge-scan-results.py
+!detect-environment.sh
+!measure-optimization.py
+
+# Python & Environment Files
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Secrets & Environment
+.env
+.env.local
+
+# OS Files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,23 @@
+# Environment Files
+.env
+.env.*
+!.env.example
+
+# Module Build & Dependencies
+node_modules/
+vendor/
+.next/
+out/
+__pycache__/
+
+# Database & Log Files
+*.log
+*.sql
+/tmp/
+/scratch/
+
+# IDE & OS Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
