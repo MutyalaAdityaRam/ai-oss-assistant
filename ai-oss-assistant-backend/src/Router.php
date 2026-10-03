@@ -66,7 +66,8 @@ class Router
                     }
                     return;
                 } catch (Throwable $e) {
-                    $statusCode = $e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 500;
+                    $code = is_numeric($e->getCode()) ? (int)$e->getCode() : 500;
+                    $statusCode = ($code >= 400 && $code < 600) ? $code : 500;
                     $this->jsonResponse([
                         'error' => $e->getMessage(),
                         'trace' => Config::getBool('APP_DEBUG') ? $e->getTraceAsString() : null,

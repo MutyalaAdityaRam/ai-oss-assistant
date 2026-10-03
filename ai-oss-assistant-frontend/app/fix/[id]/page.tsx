@@ -36,15 +36,16 @@ export default function FixDetail() {
         api.getOptimization(fixId).catch(() => ({ status: 'success', data: { fix_id: fixId, complexity_before: 12, complexity_after: 6, test_suite_duration_ms_before: 1450, test_suite_duration_ms_after: 1445, runtime_delta_pct: -0.34, summary: 'Cyclomatic complexity in dispatchEvent() dropped from 12 to 6 by replacing nested conditionals; test suite runtime was essentially unchanged (-0.34%).' } })),
       ]);
 
+      const anyDiff = diffRes as any;
       setFixData({
-        explanation: diffRes.explanation || 'No LLM summary explanation provided.',
-        diff: diffRes.diff,
-        decision_options: diffRes.decision_options || [
+        explanation: anyDiff.explanation || 'No LLM summary explanation provided.',
+        diff: anyDiff.diff,
+        decision_options: anyDiff.decision_options || [
           { option_summary: 'Option 1: Inline null-check guard in dispatchEvent()', total_score: 92.5, selected: true, scores: { correctness: 98, performance: 95, maintainability: 90, simplicity: 95, scalability: 90, security: 100, testability: 90 } },
           { option_summary: 'Option 2: Extract DispatcherStrategy interface', total_score: 84.0, selected: false, scores: { correctness: 90, performance: 80, maintainability: 85, simplicity: 70, scalability: 90, security: 95, testability: 85 } },
           { option_summary: 'Option 3: Wrap call in try-catch block', total_score: 71.0, selected: false, scores: { correctness: 75, performance: 80, maintainability: 60, simplicity: 80, scalability: 70, security: 70, testability: 65 } }
         ],
-        error: diffRes.error,
+        error: anyDiff.error,
       });
 
       setOptData(optRes.data || null);
