@@ -6,3 +6,5 @@ CREATE TABLE IF NOT EXISTS users (
   digest_frequency ENUM('daily','every_3_days','weekly') DEFAULT 'daily',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+INSERT IGNORE INTO users (id, github_installation_id, email) VALUES (1, 'inst_system_bot', 'bot@ai-oss-assistant.com');

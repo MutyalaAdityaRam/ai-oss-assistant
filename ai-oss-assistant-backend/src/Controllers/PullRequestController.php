@@ -54,6 +54,9 @@ class PullRequestController
             $body .= "- " . ($fix['issue_description'] ?? 'Automated bug fix') . "\n";
         }
 
+        // Ensure default system user exists for foreign key constraint
+        $pdo->exec("INSERT INTO users (id, github_installation_id, email) VALUES (1, 'inst_system_bot', 'bot@ai-oss-assistant.com') ON DUPLICATE KEY UPDATE id=1");
+
         // Ensure fork record exists for foreign key constraint
         $forkStmt = $pdo->prepare("SELECT id FROM forks WHERE repo_id = ? LIMIT 1");
         $forkStmt->execute([$repoId]);
