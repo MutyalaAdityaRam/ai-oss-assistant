@@ -18,7 +18,7 @@ jobs:
           MYSQL_DATABASE: ai_oss_assistant
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=10
 
     steps:
       - uses: actions/checkout@v4
@@ -35,22 +35,25 @@ jobs:
           cd ai-oss-assistant-backend
           composer install --prefer-dist --no-progress
 
+      - name: Configure Testing Environment
+        run: |
+          cat << 'EOF' > ai-oss-assistant-backend/.env
+          APP_ENV=testing
+          APP_DEBUG=true
+          API_BEARER_TOKEN=dev_secret_token_12345
+          DB_HOST=127.0.0.1
+          DB_NAME=ai_oss_assistant
+          DB_USER=root
+          DB_PASS=
+          DB_PORT=3306
+          EOF
+
       - name: Run Database Migrations
-        env:
-          DB_HOST: 127.0.0.1
-          DB_NAME: ai_oss_assistant
-          DB_USER: root
-          DB_PASS: ""
         run: |
           cd ai-oss-assistant-backend
           php migrations/run-migrations.php
 
       - name: Execute PHPUnit Test Suite
-        env:
-          DB_HOST: 127.0.0.1
-          DB_NAME: ai_oss_assistant
-          DB_USER: root
-          DB_PASS: ""
         run: |
           cd ai-oss-assistant-backend
           vendor/bin/phpunit
