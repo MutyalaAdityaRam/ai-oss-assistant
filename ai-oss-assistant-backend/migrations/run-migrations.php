@@ -45,7 +45,12 @@ try {
         $queries = array_filter(array_map('trim', explode(';', $sql)));
         foreach ($queries as $query) {
             if (!empty($query)) {
-                $pdo->exec($query);
+                try {
+                    $pdo->exec($query);
+                } catch (Throwable $e) {
+                    echo "\n[QUERY ERROR in {$filename}]: " . $e->getMessage() . "\nQuery: " . $query . "\n";
+                    throw $e;
+                }
             }
         }
         

@@ -26,7 +26,7 @@ class Config
     {
         self::load();
         $val = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
-        if ($val === false || $val === null || $val === '') {
+        if ($val === false || $val === null) {
             return $default;
         }
         return $val;
