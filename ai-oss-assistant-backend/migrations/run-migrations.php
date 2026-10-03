@@ -22,7 +22,13 @@ try {
     $stmt = $pdo->query("SELECT migration FROM schema_migrations");
     $executed = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-    $files = glob(__DIR__ . '/*.sql');
+    $allFiles = scandir(__DIR__) ?: [];
+    $files = [];
+    foreach ($allFiles as $f) {
+        if (str_ends_with($f, '.sql')) {
+            $files[] = __DIR__ . '/' . $f;
+        }
+    }
     sort($files);
 
     echo "Running database migrations...\n";
