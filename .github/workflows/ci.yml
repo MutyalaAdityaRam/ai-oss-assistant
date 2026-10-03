@@ -49,11 +49,23 @@ jobs:
           EOF
 
       - name: Run Database Migrations
+        env:
+          DB_HOST: 127.0.0.1
+          DB_NAME: ai_oss_assistant
+          DB_USER: root
+          DB_PASS: ""
+          DB_PORT: 3306
         run: |
           cd ai-oss-assistant-backend
           php migrations/run-migrations.php
 
       - name: Execute PHPUnit Test Suite
+        env:
+          DB_HOST: 127.0.0.1
+          DB_NAME: ai_oss_assistant
+          DB_USER: root
+          DB_PASS: ""
+          DB_PORT: 3306
         run: |
           cd ai-oss-assistant-backend
           vendor/bin/phpunit

@@ -40,13 +40,15 @@ try {
             continue;
         }
 
-        echo " [RUN]  {$filename}... ";
         $sql = file_get_contents($file);
+        echo " [RUN]  {$filename} (" . strlen($sql) . " bytes)... ";
         $queries = array_filter(array_map('trim', explode(';', $sql)));
+        $executedCount = 0;
         foreach ($queries as $query) {
             if (!empty($query)) {
                 try {
                     $pdo->exec($query);
+                    $executedCount++;
                 } catch (Throwable $e) {
                     echo "\n[QUERY ERROR in {$filename}]: " . $e->getMessage() . "\nQuery: " . $query . "\n";
                     throw $e;
@@ -57,7 +59,7 @@ try {
         $ins = $pdo->prepare("INSERT INTO schema_migrations (migration) VALUES (?)");
         $ins->execute([$filename]);
 
-        echo "DONE\n";
+        echo "DONE ({$executedCount} queries)\n";
     }
 
     echo "All migrations completed successfully!\n";
