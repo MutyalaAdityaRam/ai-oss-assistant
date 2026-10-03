@@ -1,6 +1,6 @@
 -- 015_add_decision_options_and_llm_cache.sql
 
-ALTER TABLE fixes ADD COLUMN IF NOT EXISTS decision_options JSON;
+ALTER TABLE fixes ADD COLUMN decision_options JSON;
 
 CREATE TABLE IF NOT EXISTS llm_cache (
   id INT AUTO_INCREMENT PRIMARY KEY,
