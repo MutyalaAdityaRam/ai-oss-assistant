@@ -36,8 +36,12 @@ try {
 
         echo " [RUN]  {$filename}... ";
         $sql = file_get_contents($file);
-        
-        $pdo->exec($sql);
+        $queries = array_filter(array_map('trim', explode(';', $sql)));
+        foreach ($queries as $query) {
+            if (!empty($query)) {
+                $pdo->exec($query);
+            }
+        }
         
         $ins = $pdo->prepare("INSERT INTO schema_migrations (migration) VALUES (?)");
         $ins->execute([$filename]);
