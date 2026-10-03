@@ -12,6 +12,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadRepos();
+    const interval = setInterval(() => {
+      loadRepos();
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   async function loadRepos() {
