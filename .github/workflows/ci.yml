@@ -1,0 +1,94 @@
+name: Continuous Integration & Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    name: Backend PHPUnit Tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: ai_oss_assistant
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, curl, mbstring, ctype, xml, json
+          coverage: none
+
+      - name: Install Composer Dependencies
+        run: |
+          cd ai-oss-assistant-backend
+          composer install --prefer-dist --no-progress
+
+      - name: Run Database Migrations
+        env:
+          DB_HOST: 127.0.0.1
+          DB_NAME: ai_oss_assistant
+          DB_USER: root
+          DB_PASS: ""
+        run: |
+          cd ai-oss-assistant-backend
+          php migrations/run-migrations.php
+
+      - name: Execute PHPUnit Test Suite
+        env:
+          DB_HOST: 127.0.0.1
+          DB_NAME: ai_oss_assistant
+          DB_USER: root
+          DB_PASS: ""
+        run: |
+          cd ai-oss-assistant-backend
+          vendor/bin/phpunit
+
+  frontend-build:
+    name: Frontend Build & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ai-oss-assistant-frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd ai-oss-assistant-frontend
+          npm ci
+
+      - name: Build Next.js Application
+        run: |
+          cd ai-oss-assistant-frontend
+          npm run build
+
+  action-scripts-check:
+    name: Python Action Scripts Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Validate Python Script Syntax
+        run: |
+          python3 -m py_compile ai-oss-assistant-actions/scripts/*.py

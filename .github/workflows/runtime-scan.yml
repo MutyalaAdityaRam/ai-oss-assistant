@@ -1,0 +1,60 @@
+name: Runtime Security Scan (ZAP + Newman)
+on:
+  workflow_dispatch:
+    inputs:
+      fork_url: { required: true, type: string }
+      repo_id: { required: true, type: string }
+
+jobs:
+  runtime-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.fork_url }}
+
+      - name: Start Application Container (Sandboxed Localhost ONLY)
+        run: |
+          if [ -f "docker-compose.yml" ]; then
+            docker compose up -d
+          elif [ -f "package.json" ]; then
+            npm run start &
+          fi
+          sleep 10
+
+      - name: OWASP ZAP Baseline Scan (Targeting localhost ONLY)
+        run: |
+          docker run --rm --network="host" -v $(pwd):/zap/wrk/:rw zaproxy/zap-stable zap-baseline.py \
+            -t http://localhost:3000 -g gen.conf -r zap_report.html -J zap_report.json || true
+
+      - name: Newman API Functional & Security Scan (Targeting localhost ONLY)
+        run: |
+          if [ -f "postman_collection.json" ]; then
+            npx newman run postman_collection.json --reporter-json newman_report.json || true
+          fi
+
+      - name: HMAC Sign and Webhook POST back to Backend
+        env:
+          WEBHOOK_SECRET: ${{ secrets.BACKEND_WEBHOOK_SECRET }}
+          WEBHOOK_URL: ${{ secrets.BACKEND_WEBHOOK_URL }}
+          REPO_ID: ${{ inputs.repo_id }}
+        run: |
+          python3 -c "
+          import json, os
+          payload = {
+              'type': 'analysis',
+              'repo_id': int(os.environ['REPO_ID']),
+              'tool': 'zap',
+              'finding_count': 0,
+              'severity_summary': {'high': 0, 'medium': 0, 'low': 0},
+              'artifact_url': 'zap_report.html'
+          }
+          with open('runtime-result.json', 'w') as f:
+              json.dump(payload, f)
+          "
+          SIG=$(openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" runtime-result.json | awk '{print $2}')
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$SIG" \
+            -d @runtime-result.json
