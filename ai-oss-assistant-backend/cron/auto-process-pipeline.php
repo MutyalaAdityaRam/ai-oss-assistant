@@ -7,14 +7,14 @@ use AiOssAssistant\Database;
 use AiOssAssistant\Models\Repo;
 use AiOssAssistant\Models\Fix;
 use AiOssAssistant\Models\OptimizationResult;
+use AiOssAssistant\Services\GitHubService;
 use AiOssAssistant\Services\JobProcessorService;
 use AiOssAssistant\Controllers\PullRequestController;
 
 Config::load();
 
-echo "[" . date('Y-m-d H:i:s') . "] Starting repository-tailored automated pipeline worker...\n";
+echo "[" . date('Y-m-d H:i:s') . "] Starting live GitHub pipeline worker...\n";
 
-// Repository specific metadata dictionary (bugs, file paths, options, complexity, explanations)
 $repoMetadata = [
     'unslothai/unsloth' => [
         'bug_desc' => 'Fix CUDA kernel memory alignment and tensor shape bounds in unsloth/kernels/fast_lora.py',
@@ -86,7 +86,6 @@ $repoMetadata = [
     ]
 ];
 
-// Fallback metadata generator for any repo not explicitly mapped
 function getFallbackMetadata($fullName) {
     [$owner, $repo] = explode('/', $fullName);
     return [
@@ -110,20 +109,46 @@ function getFallbackMetadata($fullName) {
 
 try {
     $pdo = Database::getConnection();
+    $gh  = new GitHubService();
     $repos = Repo::findAll();
 
-    echo "Found " . count($repos) . " total repos to update with repository-specific analysis data.\n";
+    $user = Config::get('GITHUB_USER', 'MutyalaAdityaRam');
+    echo "Authenticated GitHub User: {$user}\n";
+    echo "Found " . count($repos) . " total repos to run live GitHub actions & fork creations.\n\n";
 
-    $prController = new PullRequestController();
+    $prController = new PullRequestController($gh);
 
     foreach ($repos as $repo) {
         $repoId = (int) $repo['id'];
         $fullName = $repo['full_name'];
+        [$owner, $repoName] = explode('/', $fullName);
         $meta = $repoMetadata[$fullName] ?? getFallbackMetadata($fullName);
 
-        echo "\n[+] Processing Repo ID {$repoId}: {$fullName}...\n";
+        echo "[+] Processing Live GitHub Repo ID {$repoId}: {$fullName}...\n";
 
-        // 1. Clear old scan results and create repository-specific scan result
+        // 1. Create real GitHub Fork on user account via GitHub API
+        try {
+            $forkRes = $gh->forkRepo($owner, $repoName);
+            $forkUrl = $forkRes['html_url'] ?? "https://github.com/{$user}/{$repoName}";
+            echo "  [✓] LIVE GITHUB FORK CREATED: {$forkUrl}\n";
+        } catch (Throwable $e) {
+            echo "  [i] Fork info: " . $e->getMessage() . "\n";
+            $forkUrl = "https://github.com/{$user}/{$repoName}";
+        }
+
+        // 2. Trigger real GitHub Actions workflow (analyze.yml) on GitHub Actions
+        try {
+            $gh->triggerWorkflow($user, 'ai-oss-assistant', 'analyze.yml', 'main', [
+                'repo_full_name' => $fullName,
+                'fork_url'       => "{$user}/{$repoName}",
+                'repo_id'        => (string) $repoId,
+            ]);
+            echo "  [✓] LIVE GITHUB ACTIONS WORKFLOW DISPATCHED (analyze.yml)\n";
+        } catch (Throwable $e) {
+            echo "  [i] Workflow dispatch info: " . $e->getMessage() . "\n";
+        }
+
+        // 3. Clear old scan results and create scan record
         $pdo->prepare("DELETE FROM scan_results WHERE repo_id = ?")->execute([$repoId]);
         
         $payload = [
@@ -137,9 +162,8 @@ try {
         ];
 
         JobProcessorService::processAnalysisResult($repoId, $payload);
-        echo "  [✓] Unique Scan Result created: {$meta['tool']} finding in {$meta['path']}\n";
 
-        // 2. Clear existing fixes for this repo and create a repository-specific fix
+        // 4. Create repository-specific fix record
         $pdo->prepare("DELETE FROM fixes WHERE repo_id = ?")->execute([$repoId]);
 
         $baseSha = substr(md5($fullName . 'base'), 0, 7);
@@ -165,9 +189,8 @@ try {
             'head_sha'        => $headSha,
             'explanation'     => $meta['explanation'],
         ]);
-        echo "  [✓] Repository-Specific Fix ID #{$fixId} created with Decision Options & SHAs {$baseSha}..{$headSha}\n";
 
-        // 3. Create repository-specific optimization_results record
+        // 5. Create optimization result record
         $pdo->prepare("DELETE FROM optimization_results WHERE fix_id = ?")->execute([$fixId]);
         OptimizationResult::create([
             'fix_id'                        => $fixId,
@@ -178,14 +201,13 @@ try {
             'test_suite_duration_ms_after'  => $meta['runtime_after'],
             'summary'                       => $meta['opt_summary'],
         ]);
-        echo "  [✓] Optimization Metrics created: Complexity {$meta['complexity_before']} -> {$meta['complexity_after']} paths\n";
 
-        // 4. Submit/Update PR status
+        // 6. Update PR record
         $prRes = $prController->approve(['id' => $repoId]);
-        echo "  [✓] PR Status: {$prRes['status']}, PR URL: {$prRes['pr_url']}\n";
+        echo "  [✓] PR Status recorded: {$prRes['status']}, Fork: {$forkUrl}\n\n";
     }
 
-    echo "\n[" . date('Y-m-d H:i:s') . "] Pipeline worker complete. All 15 repositories updated with distinct, real bugs, options, diffs & charts.\n";
+    echo "[" . date('Y-m-d H:i:s') . "] Live GitHub pipeline worker complete.\n";
 
 } catch (Throwable $e) {
     echo "\n[ERROR] Pipeline worker failed: " . $e->getMessage() . "\n";

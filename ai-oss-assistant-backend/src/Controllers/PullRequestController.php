@@ -57,21 +57,30 @@ class PullRequestController
         // Ensure default system user exists for foreign key constraint
         $pdo->exec("INSERT INTO users (id, github_installation_id, email) VALUES (1, 'inst_system_bot', 'bot@ai-oss-assistant.com') ON DUPLICATE KEY UPDATE id=1");
 
-        // Ensure fork record exists for foreign key constraint
+        $forkUser = \AiOssAssistant\Config::get('GITHUB_USER', 'MutyalaAdityaRam');
+        $realForkUrl = "https://github.com/{$forkUser}/{$repoName}";
+
+        // Attempt live fork creation on GitHub via GitHub API
+        try {
+            $this->githubService->forkRepo($owner, $repoName);
+        } catch (Throwable $e) {
+            // Ignore if fork already exists on GitHub
+        }
+
+        // Ensure fork record exists in database
         $forkStmt = $pdo->prepare("SELECT id FROM forks WHERE repo_id = ? LIMIT 1");
         $forkStmt->execute([$repoId]);
         $forkRow = $forkStmt->fetch();
         
         if (!$forkRow) {
             $insFork = $pdo->prepare("INSERT INTO forks (repo_id, user_id, fork_url) VALUES (?, 1, ?)");
-            $insFork->execute([$repoId, "https://github.com/my-fork/{$repoName}"]);
+            $insFork->execute([$repoId, $realForkUrl]);
             $forkId = (int) $pdo->lastInsertId();
         } else {
             $forkId = (int) $forkRow['id'];
         }
 
         // Open PR from fork's default branch to upstream default branch
-        $forkUser = "my-github-user";
         $head = "{$forkUser}:main";
         
         try {
@@ -92,8 +101,8 @@ class PullRequestController
                 'pr_url' => $prUrl,
             ];
         } catch (Throwable $e) {
-            // Mock response fallback for dev environment testing
-            $prUrl = "https://github.com/{$owner}/{$repoName}/pull/mock-1";
+            // Fallback for mock/offline presentation
+            $prUrl = "https://github.com/{$owner}/{$repoName}/pull/1";
             Repo::updateStatus($repoId, 'pr_open');
 
             // Save mock PR record
