@@ -12,7 +12,8 @@ __pycache__/
 
 # Database & Log Files
 *.log
-*.sql
+*.dump.sql
+!ai-oss-assistant-backend/migrations/*.sql
 /tmp/
 /scratch/
 
