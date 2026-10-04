@@ -1,7 +1,20 @@
-# Environment & Configuration Files
+# Environment & Configuration Files (Strictly Ignored)
 .env
 .env.*
+*.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 !.env.example
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa*
+*.id_rsa
+secrets/
+credentials/
 
 # Composer Dependencies
 /vendor/

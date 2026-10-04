@@ -11,18 +11,42 @@ use AiOssAssistant\Controllers\SuggestionController;
 use AiOssAssistant\Controllers\PullRequestController;
 use AiOssAssistant\Controllers\ChatController;
 use AiOssAssistant\Controllers\AutomationController;
+use AiOssAssistant\Services\RateLimiterService;
 
-// Enable CORS for frontend requests
-header("Access-Control-Allow-Origin: *");
+Config::load();
+
+// Dynamic Whitelist CORS Configuration
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowedOriginsConfig = Config::get('CORS_ALLOWED_ORIGINS', '*');
+if ($allowedOriginsConfig === '*' || empty($allowedOriginsConfig)) {
+    header("Access-Control-Allow-Origin: *");
+} else {
+    $allowedList = array_map('trim', explode(',', $allowedOriginsConfig));
+    if (in_array($origin, $allowedList, true)) {
+        header("Access-Control-Allow-Origin: {$origin}");
+        header("Vary: Origin");
+    } else {
+        // Fallback for direct browser visits
+        header("Access-Control-Allow-Origin: " . ($allowedList[0] ?? '*'));
+    }
+}
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Hub-Signature-256");
+header("Access-Control-Max-Age: 86400");
+
+// Essential Security Headers
+header("X-Content-Type-Options: nosniff");
+header("X-Frame-Options: SAMEORIGIN");
+header("X-XSS-Protection: 1; mode=block");
+header("Referrer-Policy: strict-origin-when-cross-origin");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
 
-Config::load();
+// Global API Rate Limiting (180 requests/min per IP)
+RateLimiterService::enforceOrExit('general', 180, 60);
 
 $router = new Router();
 

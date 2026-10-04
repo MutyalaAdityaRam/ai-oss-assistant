@@ -16,6 +16,9 @@ class ChatController
 
     public function message(array $params): array
     {
+        // Enforce chat-specific rate limiting (30 requests/min per IP)
+        \AiOssAssistant\Services\RateLimiterService::enforceOrExit('chat', 30, 60);
+
         $repoId = (int) ($params['repoId'] ?? 0);
         if ($repoId <= 0) {
             throw new RuntimeException("Invalid Repo ID", 400);
@@ -27,6 +30,10 @@ class ChatController
 
         if (empty($userMessage)) {
             throw new RuntimeException("Message cannot be empty", 400);
+        }
+
+        if (mb_strlen($userMessage) > 2000) {
+            throw new RuntimeException("Message exceeds maximum allowed length of 2000 characters", 400);
         }
 
         $response = $this->chatService->processMessage($repoId, $userMessage);

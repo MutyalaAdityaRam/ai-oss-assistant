@@ -90,9 +90,20 @@ class Router
         }
 
         $token = trim(substr($authHeader, 7));
-        $expectedToken = Config::get('API_BEARER_TOKEN', 'dev_secret_token_12345');
+        $expectedToken = Config::get('API_BEARER_TOKEN');
 
-        return hash_equals($expectedToken, $token);
+        if (empty($expectedToken)) {
+            $expectedToken = 'dev_secret_token_12345';
+        }
+
+        $tokens = array_filter(array_map('trim', explode(',', $expectedToken)));
+        foreach ($tokens as $validToken) {
+            if (hash_equals($validToken, $token)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function jsonResponse(mixed $data, int $statusCode = 200): void

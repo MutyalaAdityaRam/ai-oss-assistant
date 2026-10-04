@@ -8,10 +8,22 @@
 /out/
 /build
 
-# Environment Files
+# Environment Files (Strictly Ignored)
 .env
-.env*.local
+.env.*
+*.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 !.env.example
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa*
+*.id_rsa
+secrets/
 
 # Debug & Error Logs
 npm-debug.log*

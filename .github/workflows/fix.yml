@@ -87,14 +87,12 @@ jobs:
       - name: HMAC Sign and Webhook POST back to Backend
         working-directory: target
         env:
-          WEBHOOK_SECRET: ${{ secrets.BACKEND_WEBHOOK_SECRET || 'webhook_secret_key_12345' }}
-          WEBHOOK_URL: ${{ secrets.BACKEND_WEBHOOK_URL || 'https://ai-oss-assistant.alwaysdata.net/public/webhooks/github.php' }}
+          WEBHOOK_SECRET: ${{ secrets.BACKEND_WEBHOOK_SECRET }}
+          WEBHOOK_URL: ${{ secrets.BACKEND_WEBHOOK_URL }}
         run: |
-          if [ -z "$WEBHOOK_URL" ]; then
-            WEBHOOK_URL="https://ai-oss-assistant.alwaysdata.net/public/webhooks/github.php"
-          fi
-          if [ -z "$WEBHOOK_SECRET" ]; then
-            WEBHOOK_SECRET="webhook_secret_key_12345"
+          if [ -z "$WEBHOOK_SECRET" ] || [ -z "$WEBHOOK_URL" ]; then
+            echo "::error::BACKEND_WEBHOOK_SECRET or BACKEND_WEBHOOK_URL secret is not configured in repository secrets."
+            exit 1
           fi
           SIG=$(openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" fix-result.json | awk '{print $2}')
           curl -f -s -S -X POST "$WEBHOOK_URL" \

@@ -95,16 +95,16 @@ DB_PASS=<your_secure_password>
 DB_PORT=3306
 
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-NVIDIA_MODEL_PRO=deepseek-ai/deepseek-v4-pro
-NVIDIA_API_KEY_PRO=nvapi-5pFum...
+NVIDIA_MODEL_PRO=meta/llama-3.2-11b-vision-instruct
+NVIDIA_API_KEY_PRO=<your_nvidia_api_key_pro>
 
-NVIDIA_MODEL_FLASH=deepseek-ai/deepseek-v4-flash
-NVIDIA_API_KEY_FLASH=nvapi-lYRD...
+NVIDIA_MODEL_FLASH=meta/llama-3.2-11b-vision-instruct
+NVIDIA_API_KEY_FLASH=<your_nvidia_api_key_flash>
 
-NVIDIA_API_KEY_PRO_BACKUP1=nvapi-OF7q...
-NVIDIA_API_KEY_PRO_BACKUP2=nvapi-1dAx...
-NVIDIA_API_KEY_FLASH_BACKUP1=nvapi-0gi1...
-NVIDIA_API_KEY_FLASH_BACKUP2=nvapi-Ae2i...
+NVIDIA_API_KEY_PRO_BACKUP1=<your_nvidia_api_key_backup1>
+NVIDIA_API_KEY_PRO_BACKUP2=<your_nvidia_api_key_backup2>
+NVIDIA_API_KEY_FLASH_BACKUP1=<your_nvidia_api_key_backup3>
+NVIDIA_API_KEY_FLASH_BACKUP2=<your_nvidia_api_key_backup4>
 
 GITHUB_APP_ID=<your_github_app_id>
 GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..."
@@ -140,7 +140,7 @@ In Hostinger hPanel -> **Advanced** -> **Cron Jobs**:
 
 1. Push `ai-oss-assistant-actions` directory to your GitHub account (e.g. `github.com/your-username/ai-oss-assistant-actions`).
 2. Navigate to **Settings** -> **Secrets and variables** -> **Actions** in your GitHub repo and add:
-   - `NVIDIA_API_KEY_PRO`: `nvapi-5pFum...`
+   - `NVIDIA_API_KEY_PRO`: `<your_nvidia_api_key_pro>`
    - `BACKEND_WEBHOOK_URL`: `https://your-domain.com/api/webhooks/github.php`
    - `BACKEND_WEBHOOK_SECRET`: `<matching_GITHUB_WEBHOOK_SECRET>`
 3. Workflows (`analyze.yml`, `fix.yml`, `runtime-scan.yml`) trigger automatically via `workflow_dispatch` calls from your Hostinger backend.
