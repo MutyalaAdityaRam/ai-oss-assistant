@@ -90,6 +90,17 @@ export interface SuggestionItem {
   created_at: string;
 }
 
+export interface AutomationStatusData {
+  automation_status: 'active' | 'paused' | 'run_once';
+  is_paused: boolean;
+  is_run_once: boolean;
+  can_search_and_scan: boolean;
+  last_run_at: string | null;
+  paused_at: string | null;
+  run_once_at: string | null;
+  description: string;
+}
+
 export const api = {
   getRepos: () => fetchApi<{ data: RepoItem[] }>('/api/repos'),
   getRepoDetail: (id: number) => fetchApi<{ data: { repo: RepoItem; scan_results: ScanResultItem[]; fixes: FixItem[] } }>(`/api/repos/${id}`),
@@ -103,4 +114,8 @@ export const api = {
   submitCustomSuggestion: (repoId: number, description: string) => fetchApi<{ status: string; suggestion_id: number; fix_id: number }>(`/api/repos/${repoId}/suggestions/custom`, { method: 'POST', body: JSON.stringify({ description }) }),
   skipSuggestions: (repoId: number) => fetchApi<{ status: string; skipped_count: number }>(`/api/repos/${repoId}/suggestions/skip`, { method: 'POST' }),
   sendMessage: (repoId: number, message: string) => fetchApi<{ data: any }>(`/api/chat/${repoId}`, { method: 'POST', body: JSON.stringify({ message }) }),
+  getAutomationStatus: () => fetchApi<{ status: string; data: AutomationStatusData }>('/api/automation/status'),
+  pauseAutomation: () => fetchApi<{ status: string; message: string; data: AutomationStatusData }>('/api/automation/pause', { method: 'POST' }),
+  resumeAutomation: () => fetchApi<{ status: string; message: string; data: AutomationStatusData }>('/api/automation/resume', { method: 'POST' }),
+  runOnceAutomation: (triggerNow: boolean = true) => fetchApi<{ status: string; message: string; data: AutomationStatusData }>('/api/automation/run-once', { method: 'POST', body: JSON.stringify({ trigger_now: triggerNow }) }),
 };

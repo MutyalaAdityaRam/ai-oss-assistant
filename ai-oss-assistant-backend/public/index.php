@@ -10,6 +10,7 @@ use AiOssAssistant\Controllers\OptimizationController;
 use AiOssAssistant\Controllers\SuggestionController;
 use AiOssAssistant\Controllers\PullRequestController;
 use AiOssAssistant\Controllers\ChatController;
+use AiOssAssistant\Controllers\AutomationController;
 
 // Enable CORS for frontend requests
 header("Access-Control-Allow-Origin: *");
@@ -24,6 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 Config::load();
 
 $router = new Router();
+
+// Automation Control Endpoints (Pause, Resume, Run-Once)
+$router->get('/api/automation/status', [AutomationController::class, 'getStatus']);
+$router->post('/api/automation/pause', [AutomationController::class, 'pause']);
+$router->post('/api/automation/resume', [AutomationController::class, 'resume']);
+$router->post('/api/automation/run-once', [AutomationController::class, 'runOnce']);
 
 // Repo Endpoints
 $router->get('/api/repos', [RepoController::class, 'index']);

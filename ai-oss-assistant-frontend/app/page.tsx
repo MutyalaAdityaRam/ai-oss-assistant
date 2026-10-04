@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, RepoItem } from '@/lib/api';
 import { RepoCardSkeleton } from '@/components/Skeletons';
+import AutomationControlBar from '@/components/AutomationControlBar';
 
 export default function Dashboard() {
   const [repos, setRepos] = useState<RepoItem[]>([]);
@@ -49,6 +50,9 @@ export default function Dashboard() {
         </div>
         <button onClick={loadRepos} className="btn btn-secondary">Refresh Status</button>
       </div>
+
+      {/* Real-time Automation Control Panel (Pause, Resume, Run-Once) */}
+      <AutomationControlBar />
 
       {/* Filter Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>

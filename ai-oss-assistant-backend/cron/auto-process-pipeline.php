@@ -9,11 +9,27 @@ use AiOssAssistant\Models\Fix;
 use AiOssAssistant\Models\OptimizationResult;
 use AiOssAssistant\Services\GitHubService;
 use AiOssAssistant\Services\JobProcessorService;
+use AiOssAssistant\Services\AutomationControlService;
 use AiOssAssistant\Controllers\PullRequestController;
 
 Config::load();
 
 echo "[" . date('Y-m-d H:i:s') . "] Starting Critical-First Bug Analysis & Fix Pipeline Worker...\n";
+
+// Automation Pipeline Control Check (Active, Paused, Run Once)
+if (!AutomationControlService::shouldSearchAndScan()) {
+    echo "[" . date('Y-m-d H:i:s') . "] [PAUSED] Automation is currently paused.\n";
+    echo "  - Automated repository discovery, cloning, scanning, and bug fixing are SUSPENDED.\n";
+    echo "  - All interactive and user-facing services (PR acceptance, PR decline, PR webhooks, chat bot, repo deletion) remain FULLY ACTIVE.\n";
+    echo "  - To resume, click 'Resume Automation' in the dashboard or run POST /api/automation/resume.\n";
+    exit(0);
+}
+
+$currentStatus = AutomationControlService::getStatus();
+echo "[" . date('Y-m-d H:i:s') . "] Automation Mode: {$currentStatus}\n";
+if ($currentStatus === AutomationControlService::STATUS_RUN_ONCE) {
+    echo "  [RUN ONCE MODE] Executing today's single cycle. The pipeline will automatically switch to PAUSED upon completion.\n";
+}
 
 // Repository specific metadata dictionary — CRITICAL & HIGH SEVERITY VULNERABILITIES ONLY
 $repoMetadata = [
@@ -196,7 +212,14 @@ try {
         echo "  [✓] PR Status: {$prRes['status']}, Fork: {$forkUrl}\n\n";
     }
 
-    echo "[" . date('Y-m-d H:i:s') . "] Pipeline worker complete. All 15 repositories configured with CRITICAL BUGS FIRST.\n";
+    // Mark run completion (transitions 'run_once' to 'paused', records last_run_at)
+    AutomationControlService::markRunCompleted();
+    $finalStatus = AutomationControlService::getStatus();
+
+    echo "[" . date('Y-m-d H:i:s') . "] Pipeline worker complete. All repositories configured with CRITICAL BUGS FIRST.\n";
+    if ($finalStatus === AutomationControlService::STATUS_PAUSED && $currentStatus === AutomationControlService::STATUS_RUN_ONCE) {
+        echo "  [RUN ONCE COMPLETE] Single-cycle pass has finished. Automation is now PAUSED. No new scans or fixes will run until resumed.\n";
+    }
 
 } catch (Throwable $e) {
     echo "\n[ERROR] Pipeline worker failed: " . $e->getMessage() . "\n";

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import AutomationControlBar from '@/components/AutomationControlBar';
 
 export default function Settings() {
   const [spendCap, setSpendCap] = useState<number>(5.00);
@@ -51,6 +52,9 @@ export default function Settings() {
           {statusMsg}
         </div>
       )}
+
+      {/* Automation Pipeline Control Panel */}
+      <AutomationControlBar />
 
       <form onSubmit={handleSaveSettings} className="glass-panel" style={{ padding: '24px' }}>
         {/* Spend Cap Setting */}
