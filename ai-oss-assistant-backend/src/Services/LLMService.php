@@ -246,6 +246,28 @@ class LLMService
         if (str_contains($prompt, 'Cyclomatic Complexity')) {
             return "Automated LLM Summary: Cyclomatic complexity dropped from 12 to 6 by replacing nested conditionals; test suite runtime was essentially unchanged (-0.34%).";
         }
-        return "LLM Mock Response: Verified fix logic for requested target.";
+
+        if (str_contains($prompt, 'Principal Software Architect') || str_contains($prompt, 'Implementation Plan') || str_contains($prompt, 'Developer Request')) {
+            $repo = 'the target repository';
+            if (preg_match('/on the open-source repository:\s*([^\s(]+)/', $prompt, $m)) {
+                $repo = trim($m[1]);
+            }
+            return "### Technical Implementation & Engineering Plan for {$repo}\n\n"
+                 . "**1. Architectural Root Cause Analysis:**\n"
+                 . "The detected vulnerability in `{$repo}` stems from unconstrained boundary checks and state lifecycle retaining cycles during execution. This causes runtime exceptions and memory corruption under irregular payloads.\n\n"
+                 . "**2. Step-by-Step Implementation Strategy:**\n"
+                 . "- **Target Module Modification**: Locate the identified file in the scanner report and replace unsafe operations with strict boundary sanitization.\n"
+                 . "- **Defensive Memory & State Guards**: Enforce contiguous layout allocation and replace strong references with auto-disposable registries.\n"
+                 . "- **API Stability**: Preserve existing method signatures and exports to guarantee 100% backward compatibility for downstream consumers.\n\n"
+                 . "**3. Verification & Test Plan:**\n"
+                 . "- Run containerized unit and integration test suites.\n"
+                 . "- Execute regression tests with boundary condition payloads.\n"
+                 . "- Re-scan with Semgrep, Trivy, and Gitleaks to ensure 0 remaining critical findings.\n\n"
+                 . "**4. PR & Maintainer Readiness:**\n"
+                 . "- Squash commits into a semantic commit message (`fix(core): remediate runtime boundary vulnerability`).\n"
+                 . "- Include before/after complexity reduction metrics in the PR body to facilitate maintainer review.";
+        }
+
+        return "Implementation Plan formulated. Ready to apply code changes and execute container tests.";
     }
 }

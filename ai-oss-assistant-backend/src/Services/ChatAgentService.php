@@ -188,9 +188,12 @@ class ChatAgentService
             $fixesText = "  (No automated fixes created yet)\n";
         }
 
+        $parts = explode('/', $repo['full_name']);
+        $repoName = $parts[1] ?? $parts[0];
+
         $prompt = <<<PROMPT
 You are an expert AI Principal Software Architect assisting a developer on the open-source repository: {$repo['full_name']} ({$repo['stars']} stars).
-Fork URL: https://github.com/{$user}/{$repo['name']}
+Fork URL: https://github.com/{$user}/{$repoName}
 Current Pipeline Status: {$repo['status']}
 
 Identified Bugs & Security Vulnerabilities:
