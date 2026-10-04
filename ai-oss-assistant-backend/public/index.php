@@ -57,8 +57,14 @@ $router->post('/api/chat/{repoId}/fix', [ChatController::class, 'requestFix']);
 $router->post('/webhooks/github.php', function() {
     require __DIR__ . '/webhooks/github.php';
 }, false);
+$router->post('/public/webhooks/github.php', function() {
+    require __DIR__ . '/webhooks/github.php';
+}, false);
 
 $router->post('/webhooks/github-pr-status.php', function() {
+    require __DIR__ . '/webhooks/github-pr-status.php';
+}, false);
+$router->post('/public/webhooks/github-pr-status.php', function() {
     require __DIR__ . '/webhooks/github-pr-status.php';
 }, false);
 
