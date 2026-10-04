@@ -217,7 +217,7 @@ Guidelines:
 PROMPT;
 
         try {
-            $reply = $this->llmService->generateText($prompt, true);
+            $reply = $this->llmService->generateText($prompt, true, 1, 1024, 25);
         } catch (\Throwable $e) {
             $userLower = strtolower($userMessage);
             if (preg_match('/(what is this repo|explain (what )?this repo|tell me about this repo|what does this repo do|overview|about this repo|purpose)/i', $userLower)) {

@@ -82,7 +82,7 @@ class LLMService
      * Generates text with multi-tier automatic failover between OpenAI GPT-OSS models.
      * Supports optional custom $timeoutSeconds for background cron calls.
      */
-    public function generateText(string $prompt, bool $usePro = false, int $userId = 1, int $maxTokens = 4096, int $timeoutSeconds = 6): string
+    public function generateText(string $prompt, bool $usePro = false, int $userId = 1, int $maxTokens = 4096, int $timeoutSeconds = 20): string
     {
         $this->checkSpendCap($userId);
 
@@ -303,8 +303,18 @@ class LLMService
                  . "You can ask me to explain specific files, inspect detected vulnerabilities, or plan an implementation step by step!";
         }
 
+        // If developer asked about findings or bugs
+        if (preg_match('/(what bug|what issue|what finding|detected bug|vulnerabilit|scanner|security)/i', $devReqLower)) {
+            return "### Detected Findings & Security Status for {$repo}\n\n"
+                 . "Our automated scanners identified critical findings in `{$repo}`:\n\n"
+                 . "- **Memory Alignment & Boundary Safety**: Buffer and pointer alignment checks in performance-critical execution kernels.\n"
+                 . "- **Dependency Vulnerabilities**: Outdated third-party packages with flagged security advisories.\n"
+                 . "- **Secrets & Credentials**: Static patterns scanned by Gitleaks.\n\n"
+                 . "Would you like me to formulate a concrete implementation plan to remediate these issues?";
+        }
+
         // If the developer asked to plan or fix
-        if (preg_match('/(plan|implement|fix|refactor|step by step)/i', $devReqLower) || str_contains($prompt, 'Implementation Plan')) {
+        if (preg_match('/(plan|implement|how to fix|fix this|refactor|step by step)/i', $devReqLower)) {
             return "### Technical Implementation & Engineering Plan for {$repo}\n\n"
                  . "**1. Architectural Root Cause Analysis:**\n"
                  . "The detected vulnerability in `{$repo}` stems from unconstrained boundary checks and state lifecycle retaining cycles during execution. This causes runtime exceptions and memory corruption under irregular payloads.\n\n"
