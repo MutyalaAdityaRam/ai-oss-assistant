@@ -203,10 +203,10 @@ class FileClassificationAndScopingTest extends TestCase
     {
         $pdo = Database::getConnection();
 
-        // Create test repo
+        // Create test repo with isolated name
         $repoId = Repo::create([
-            'full_name' => 'test-owner/test-public-scoping-repo',
-            'html_url' => 'https://github.com/test-owner/test-public-scoping-repo',
+            'full_name' => 'test-owner/test-public-scoping-repo-' . uniqid(),
+            'html_url' => 'https://github.com/test-owner/test-public-scoping-repo-' . uniqid(),
             'stars' => 100,
             'language' => 'PHP',
             'status' => 'candidate'
