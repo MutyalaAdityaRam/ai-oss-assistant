@@ -1,31 +1,49 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost/AI/ai-oss-assistant-backend/public';
+const FALLBACK_API_URL = 'https://ai-oss-assistant.alwaysdata.net';
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || 'dev_secret_token_12345';
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s fast timeout to prevent browser hanging
-
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${API_TOKEN}`,
     ...(options.headers || {}),
   };
 
+  // Try primary URL first
   try {
-    const response = await fetch(url, { ...options, headers, signal: controller.signal });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const primaryUrl = `${API_BASE_URL}${endpoint}`;
+    const response = await fetch(primaryUrl, { ...options, headers, signal: controller.signal });
     clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `API Request failed with status ${response.status}`);
-    }
 
-    return response.json();
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    throw err;
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    // If primary failed and it's different from fallback, try live Alwaysdata backend
   }
+
+  // Attempt fallback if primary failed or returned error
+  if (API_BASE_URL !== FALLBACK_API_URL) {
+    try {
+      const fallbackController = new AbortController();
+      const fallbackTimeout = setTimeout(() => fallbackController.abort(), 6000);
+      const fallbackUrl = `${FALLBACK_API_URL}${endpoint}`;
+      const fallbackResponse = await fetch(fallbackUrl, { ...options, headers, signal: fallbackController.signal });
+      clearTimeout(fallbackTimeout);
+
+      if (fallbackResponse.ok) {
+        return await fallbackResponse.json();
+      }
+      const errJson = await fallbackResponse.json().catch(() => ({}));
+      throw new Error(errJson.error || `API Request failed with status ${fallbackResponse.status}`);
+    } catch (fallbackErr: any) {
+      throw fallbackErr;
+    }
+  }
+
+  throw new Error(`Failed to connect to API backend`);
 }
 
 export interface RepoItem {
