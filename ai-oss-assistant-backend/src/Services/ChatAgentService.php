@@ -46,22 +46,53 @@ class ChatAgentService
         $stars = number_format($repo['stars'] ?? 0);
         $topFinding = !empty($findingsList) ? ($findingsList[0]['msg'] ?? $findingsList[0]['message'] ?? 'Critical security vulnerabilities') : 'No open critical vulnerabilities';
 
+        // Retrieve or cache repository metadata (description, language, topics) from GitHub
+        $devConfig = $repo['devcontainer_config'] ?? [];
+        if (!is_array($devConfig)) {
+            $devConfig = json_decode((string)$devConfig, true) ?: [];
+        }
+        $repoMetadata = $devConfig['repo_metadata'] ?? null;
+
+        if (!$repoMetadata) {
+            try {
+                $ghData = $this->githubService->request('GET', '/repos/' . $repo['full_name']);
+                if (!empty($ghData) && !empty($ghData['name'])) {
+                    $repoMetadata = [
+                        'description'    => $ghData['description'] ?? '',
+                        'language'       => $ghData['language'] ?? 'Python',
+                        'topics'         => $ghData['topics'] ?? [],
+                        'homepage'       => $ghData['homepage'] ?? '',
+                        'default_branch' => $ghData['default_branch'] ?? 'main',
+                    ];
+                    $devConfig['repo_metadata'] = $repoMetadata;
+                    Repo::updateDevcontainerConfig($repoId, $devConfig);
+                }
+            } catch (\Throwable $e) {
+                $repoMetadata = [
+                    'description' => '',
+                    'language'    => 'Unknown',
+                    'topics'      => [],
+                ];
+            }
+        }
+
         $greeting = "Hello! I am your dedicated engineering assistant for **{$repo['full_name']}** ({$stars} ⭐).\n\n"
                   . "I am fully aware of this repository's architecture, its " . count($findingsList) . " detected findings, and " . count($fixes) . " prepared fixes. "
                   . "I can help you analyze root causes, design implementation plans, test bug fixes, or adjust commits on your fork.\n\n"
                   . "What would you like to plan or work on for **{$repo['full_name']}**?";
 
         return [
-            'repo'          => $repo,
-            'findings_count'=> count($findingsList),
-            'findings'      => $findingsList,
-            'fixes'         => $fixes,
-            'greeting'      => $greeting,
+            'repo'              => $repo,
+            'repo_metadata'     => $repoMetadata,
+            'findings_count'    => count($findingsList),
+            'findings'          => $findingsList,
+            'fixes'             => $fixes,
+            'greeting'          => $greeting,
             'suggested_prompts' => [
-                "Plan the step-by-step implementation for the critical bug in {$repo['full_name']}",
-                "Explain the architectural root cause of the top finding",
-                "How do we verify this fix without causing regressions?",
-                "What files and tests need to be modified in my fork?",
+                "What is this repository and what does it do?",
+                "What critical vulnerabilities were found in {$repo['full_name']}?",
+                "Plan the step-by-step implementation for the top critical bug",
+                "Explain the root cause and regression test strategy",
             ],
         ];
     }
@@ -143,6 +174,7 @@ class ChatAgentService
     {
         $context = $this->getRepoContext($repoId);
         $repo = $context['repo'];
+        $repoMetadata = $context['repo_metadata'] ?? [];
         $findings = $context['findings'];
         $fixes = $context['fixes'];
         $user = Config::get('GITHUB_USER', 'MutyalaAdityaRam');
@@ -161,7 +193,7 @@ class ChatAgentService
             }
         }
 
-        // Build rich prompt for Principal Engineer LLM
+        // Build rich findings summary
         $findingsText = "";
         foreach (array_slice($findings, 0, 5) as $idx => $f) {
             $num = $idx + 1;
@@ -176,6 +208,7 @@ class ChatAgentService
             $findingsText = "  (No raw scanner findings currently flagged)\n";
         }
 
+        // Build rich fixes summary
         $fixesText = "";
         foreach (array_slice($fixes, 0, 3) as $idx => $fix) {
             $num = $idx + 1;
@@ -190,30 +223,48 @@ class ChatAgentService
 
         $parts = explode('/', $repo['full_name']);
         $repoName = $parts[1] ?? $parts[0];
+        $stars = number_format($repo['stars'] ?? 0);
+        $findingsCount = count($findings);
+        $fixesCount = count($fixes);
+
+        $description = !empty($repoMetadata['description']) ? $repoMetadata['description'] : 'High-impact open source repository';
+        $language = !empty($repoMetadata['language']) ? $repoMetadata['language'] : 'Polyglot';
+        $topics = !empty($repoMetadata['topics']) ? implode(', ', (array)$repoMetadata['topics']) : 'Open Source';
 
         $prompt = <<<PROMPT
-You are an expert AI Principal Software Architect assisting a developer on the open-source repository: {$repo['full_name']} ({$repo['stars']} stars).
-Fork URL: https://github.com/{$user}/{$repoName}
-Current Pipeline Status: {$repo['status']}
+You are Antigravity's Principal Software Architect & Pair Programming AI assistant for open-source engineering.
+You are actively pair programming with a developer who is viewing repository: {$repo['full_name']}.
 
-Identified Bugs & Security Vulnerabilities:
+[FACTUAL REPOSITORY PROFILE - GROUND TRUTH]
+- Repository: {$repo['full_name']} ({$stars} stars)
+- Official Description: {$description}
+- Primary Language: {$language}
+- Topics / Ecosystem: {$topics}
+- Fork Repository: https://github.com/{$user}/{$repoName}
+- Automated Pipeline Status: {$repo['status']}
+
+[AUTOMATED PIPELINE CONTEXT]
+- Detected Security / Bug Findings ({$findingsCount} total):
 {$findingsText}
-Prepared Fixes & Optimizations:
+- Prepared Fixes / Optimization PRs ({$fixesCount} total):
 {$fixesText}
 
-Developer Request:
+[DEVELOPER MESSAGE]
 "{$userMessage}"
 
-Guidelines:
-1. You are FULLY AWARE of {$repo['full_name']}'s purpose, ecosystem role, and codebase.
-2. Directly, concisely, and accurately answer the Developer's Request: "{$userMessage}". Do NOT dump a generic implementation plan if the user is asking an explanation, general question, or repository overview!
-3. If the user asks what the repo is, explain its purpose, ecosystem role, technology stack, and summary of current repository health and detected vulnerabilities.
-4. If the user explicitly asks to plan an implementation or fix an issue, provide a concrete, step-by-step Technical Implementation Plan:
-   - **Root Cause Analysis**: Why this issue happens in {$repo['full_name']}.
-   - **Step-by-Step Implementation**: Specific files, classes, methods to change, and code structure.
-   - **Verification & Test Strategy**: Unit tests, edge cases to guard against, and performance considerations.
-   - **PR Recommendation**: Clear commit message and why maintainers will accept it.
-5. Keep the tone professional, authoritative, and direct. Use markdown bullet points and code blocks.
+[STRICT INSTRUCTIONS - READ CAREFULLY]
+1. Answer the developer's message directly, accurately, and naturally — just like ChatGPT, Claude, or an elite senior staff engineer pairing in an IDE.
+2. DO NOT output an unsolicited "Technical Implementation Plan", "Root Cause Analysis", or "PR Recommendation" unless the user EXPLICITLY asks to plan a fix, solve a bug, or write code!
+3. If the user asks about the repo (e.g. "tell me about this repo", "what is this repo", "overview", "what does it do?"):
+   - Base your answer strictly on the factual repository profile above (do NOT hallucinate unrelated domains like 3D point clouds).
+   - Explain what {$repo['full_name']} actually is, its real-world purpose, architecture/tech stack, and why developers use it.
+   - Summarize the current status in our automated pipeline (mentioning the {$findingsCount} detected findings and {$fixesCount} prepared fixes).
+   - Conclude naturally by asking what they would like to focus on next (e.g. reviewing a specific finding, generating a fix plan, or checking test cases).
+4. If and ONLY IF the user explicitly asks to plan an implementation or fix a bug (e.g. "plan the fix for...", "how do we fix finding 1", "generate implementation plan"):
+   - Provide a deep technical plan with Root Cause Analysis, Step-by-Step Code Changes, Verification/Tests, and PR Recommendation.
+5. If the user asks any other technical, architectural, or debugging question:
+   - Provide a direct, technically precise answer addressing exactly what was asked.
+6. Tone: Highly intelligent, authoritative, clean markdown formatting, zero fluff.
 PROMPT;
 
         try {
@@ -222,28 +273,19 @@ PROMPT;
             $userLower = strtolower($userMessage);
             if (preg_match('/(what is this repo|explain (what )?this repo|tell me about this repo|what does this repo do|overview|about this repo|purpose)/i', $userLower)) {
                 $reply = "### Repository Overview: {$repo['full_name']}\n\n"
-                       . "**Repository:** `{$repo['full_name']}` ({$repo['stars']} ⭐)\n"
-                       . "**Fork:** https://github.com/{$user}/{$repoName}\n\n"
-                       . "**Ecosystem Role & Purpose:**\n"
-                       . "`{$repo['full_name']}` is an open-source project monitored in your automated pipeline. Our systems actively analyze its codebase, detect vulnerabilities, run tests, and prepare maintainer-grade pull requests.\n\n"
-                       . "**Current Analysis Findings:**\n"
-                       . "- Detected " . count($findings) . " security/correctness findings across static analysis tools.\n"
-                       . "- Prepared " . count($fixes) . " validated fixes ready for review or merging.\n\n"
-                       . "Ask me any specific question about the codebase, or ask to **plan an implementation** to see the step-by-step fix strategy!";
+                       . "**Official Purpose:**\n"
+                       . "{$description}\n\n"
+                       . "**Technology Stack:** {$language}" . (!empty($topics) ? " • {$topics}" : "") . " ({$stars} ⭐)\n\n"
+                       . "**Automated Pipeline Status:**\n"
+                       . "- Currently tracking {$findingsCount} detected findings across static analysis tools.\n"
+                       . "- Prepared {$fixesCount} validated fixes ready on your fork.\n\n"
+                       . "What would you like to inspect next? You can ask to **plan an implementation for the top finding**, explore the root cause, or review the prepared fixes.";
             } else {
-                $reply = "### Technical Implementation & Engineering Plan for {$repo['full_name']}\n\n"
-                       . "**1. Context & Architecture Awareness:**\n"
-                       . "We are working on `{$repo['full_name']}`. The primary objective is resolving the high-priority findings detected during static analysis.\n\n"
-                       . "**2. Implementation Steps:**\n"
-                       . "- Locate the affected file identified in scan results.\n"
-                       . "- Implement strict boundary checks and prevent unsafe dynamic evaluations or unaligned memory allocations.\n"
-                       . "- Maintain backward compatibility with existing public APIs.\n\n"
-                       . "**3. Verification:**\n"
-                       . "- Run the repository's test suite inside the container environment.\n"
-                       . "- Rescan with Semgrep and Trivy to confirm 0 remaining vulnerabilities.\n\n"
-                       . "**4. Fork & PR Action:**\n"
-                       . "- Commit changes with descriptive semantic message to branch `fix/critical-remediation`.\n"
-                       . "- Ready for PR submission to upstream maintainers.";
+                $reply = "### Engineering Response for {$repo['full_name']}\n\n"
+                       . "Regarding your query: \"{$userMessage}\"\n\n"
+                       . "- **Repository Context:** `{$repo['full_name']}` ({$language})\n"
+                       . "- **Active Findings:** {$findingsCount} issues detected in our automated pipeline.\n\n"
+                       . "Let me know if you would like me to generate a complete step-by-step fix plan or analyze a specific vulnerability in detail.";
             }
         }
 
