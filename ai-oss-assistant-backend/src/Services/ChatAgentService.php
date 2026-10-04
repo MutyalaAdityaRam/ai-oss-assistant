@@ -205,32 +205,46 @@ Developer Request:
 "{$userMessage}"
 
 Guidelines:
-1. You are FULLY AWARE of {$repo['full_name']}'s purpose, codebase architecture, and its specific identified bugs.
-2. If the user asks to plan an implementation or fix an issue, provide a concrete, step-by-step Technical Implementation Plan:
+1. You are FULLY AWARE of {$repo['full_name']}'s purpose, ecosystem role, and codebase.
+2. Directly, concisely, and accurately answer the Developer's Request: "{$userMessage}". Do NOT dump a generic implementation plan if the user is asking an explanation, general question, or repository overview!
+3. If the user asks what the repo is, explain its purpose, ecosystem role, technology stack, and summary of current repository health and detected vulnerabilities.
+4. If the user explicitly asks to plan an implementation or fix an issue, provide a concrete, step-by-step Technical Implementation Plan:
    - **Root Cause Analysis**: Why this issue happens in {$repo['full_name']}.
    - **Step-by-Step Implementation**: Specific files, classes, methods to change, and code structure.
    - **Verification & Test Strategy**: Unit tests, edge cases to guard against, and performance considerations.
    - **PR Recommendation**: Clear commit message and why maintainers will accept it.
-3. Keep the tone professional, authoritative, and direct. Use markdown bullet points and code blocks.
+5. Keep the tone professional, authoritative, and direct. Use markdown bullet points and code blocks.
 PROMPT;
 
         try {
             $reply = $this->llmService->generateText($prompt, true);
         } catch (\Throwable $e) {
-            // Intelligent contextual fallback if LLM endpoint is busy
-            $reply = "### Implementation Plan for {$repo['full_name']}\n\n"
-                   . "**1. Context & Architecture Awareness:**\n"
-                   . "We are working on `{$repo['full_name']}`. The primary objective is resolving the high-priority findings detected during static analysis.\n\n"
-                   . "**2. Implementation Steps:**\n"
-                   . "- Locate the affected file identified in scan results.\n"
-                   . "- Implement strict boundary checks and prevent unsafe dynamic evaluations or unaligned memory allocations.\n"
-                   . "- Maintain backward compatibility with existing public APIs.\n\n"
-                   . "**3. Verification:**\n"
-                   . "- Run the repository's test suite inside the container environment.\n"
-                   . "- Rescan with Semgrep and Trivy to confirm 0 remaining vulnerabilities.\n\n"
-                   . "**4. Fork & PR Action:**\n"
-                   . "- Commit changes with descriptive semantic message to branch `fix/critical-remediation`.\n"
-                   . "- Ready for PR submission to upstream maintainers.";
+            $userLower = strtolower($userMessage);
+            if (preg_match('/(what is this repo|explain (what )?this repo|tell me about this repo|what does this repo do|overview|about this repo|purpose)/i', $userLower)) {
+                $reply = "### Repository Overview: {$repo['full_name']}\n\n"
+                       . "**Repository:** `{$repo['full_name']}` ({$repo['stars']} ⭐)\n"
+                       . "**Fork:** https://github.com/{$user}/{$repoName}\n\n"
+                       . "**Ecosystem Role & Purpose:**\n"
+                       . "`{$repo['full_name']}` is an open-source project monitored in your automated pipeline. Our systems actively analyze its codebase, detect vulnerabilities, run tests, and prepare maintainer-grade pull requests.\n\n"
+                       . "**Current Analysis Findings:**\n"
+                       . "- Detected " . count($findings) . " security/correctness findings across static analysis tools.\n"
+                       . "- Prepared " . count($fixes) . " validated fixes ready for review or merging.\n\n"
+                       . "Ask me any specific question about the codebase, or ask to **plan an implementation** to see the step-by-step fix strategy!";
+            } else {
+                $reply = "### Technical Implementation & Engineering Plan for {$repo['full_name']}\n\n"
+                       . "**1. Context & Architecture Awareness:**\n"
+                       . "We are working on `{$repo['full_name']}`. The primary objective is resolving the high-priority findings detected during static analysis.\n\n"
+                       . "**2. Implementation Steps:**\n"
+                       . "- Locate the affected file identified in scan results.\n"
+                       . "- Implement strict boundary checks and prevent unsafe dynamic evaluations or unaligned memory allocations.\n"
+                       . "- Maintain backward compatibility with existing public APIs.\n\n"
+                       . "**3. Verification:**\n"
+                       . "- Run the repository's test suite inside the container environment.\n"
+                       . "- Rescan with Semgrep and Trivy to confirm 0 remaining vulnerabilities.\n\n"
+                       . "**4. Fork & PR Action:**\n"
+                       . "- Commit changes with descriptive semantic message to branch `fix/critical-remediation`.\n"
+                       . "- Ready for PR submission to upstream maintainers.";
+            }
         }
 
         // If user instructed a code fix action, also record a fix item if requested
