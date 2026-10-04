@@ -50,6 +50,11 @@ try {
                     $pdo->exec($query);
                     $executedCount++;
                 } catch (Throwable $e) {
+                    // Ignore duplicate column name or duplicate key errors on ALTER TABLE (MySQL 8 compatibility)
+                    if (str_contains($e->getMessage(), '1060 Duplicate column') || str_contains($e->getMessage(), 'already exists')) {
+                        $executedCount++;
+                        continue;
+                    }
                     echo "\n[QUERY ERROR in {$filename}]: " . $e->getMessage() . "\nQuery: " . $query . "\n";
                     throw $e;
                 }
