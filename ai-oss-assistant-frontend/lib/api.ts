@@ -39,6 +39,17 @@ export interface RepoItem {
   created_at: string;
 }
 
+export interface FindingItem {
+  tool?: string;
+  rule_id?: string;
+  severity?: string;
+  path?: string;
+  line?: number;
+  msg?: string;
+  message?: string;
+  explanation?: string;
+}
+
 export interface ScanResultItem {
   id: number;
   repo_id: number;
@@ -46,6 +57,7 @@ export interface ScanResultItem {
   finding_count: number;
   severity_summary?: { high: number; medium: number; low: number };
   artifact_url?: string;
+  findings?: FindingItem[];
   created_at: string;
 }
 
@@ -61,6 +73,7 @@ export interface FixItem {
   retry_count: number;
   merge_status: string;
   source: string;
+  priority_tier?: string;
   created_at: string;
 }
 
@@ -114,6 +127,7 @@ export const api = {
   submitCustomSuggestion: (repoId: number, description: string) => fetchApi<{ status: string; suggestion_id: number; fix_id: number }>(`/api/repos/${repoId}/suggestions/custom`, { method: 'POST', body: JSON.stringify({ description }) }),
   skipSuggestions: (repoId: number) => fetchApi<{ status: string; skipped_count: number }>(`/api/repos/${repoId}/suggestions/skip`, { method: 'POST' }),
   sendMessage: (repoId: number, message: string) => fetchApi<{ data: any }>(`/api/chat/${repoId}`, { method: 'POST', body: JSON.stringify({ message }) }),
+  getChatContext: (repoId: number) => fetchApi<{ status: string; data: { repo: RepoItem; findings_count: number; findings: FindingItem[]; fixes: FixItem[]; greeting: string; suggested_prompts: string[] } }>(`/api/chat/${repoId}/context`),
   getAutomationStatus: () => fetchApi<{ status: string; data: AutomationStatusData }>('/api/automation/status'),
   pauseAutomation: () => fetchApi<{ status: string; message: string; data: AutomationStatusData }>('/api/automation/pause', { method: 'POST' }),
   resumeAutomation: () => fetchApi<{ status: string; message: string; data: AutomationStatusData }>('/api/automation/resume', { method: 'POST' }),

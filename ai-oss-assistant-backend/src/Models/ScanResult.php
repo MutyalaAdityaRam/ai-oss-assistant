@@ -18,6 +18,11 @@ class ScanResult
             if (!empty($row['severity_summary'])) {
                 $row['severity_summary'] = json_decode($row['severity_summary'], true);
             }
+            if (!empty($row['findings'])) {
+                $row['findings'] = json_decode($row['findings'], true);
+            } else {
+                $row['findings'] = [];
+            }
         }
         return $rows;
     }
@@ -26,11 +31,12 @@ class ScanResult
     {
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("
-            INSERT INTO scan_results (repo_id, tool, finding_count, severity_summary, artifact_url)
-            VALUES (:repo_id, :tool, :finding_count, :severity_summary, :artifact_url)
+            INSERT INTO scan_results (repo_id, tool, finding_count, severity_summary, artifact_url, findings)
+            VALUES (:repo_id, :tool, :finding_count, :severity_summary, :artifact_url, :findings)
         ");
 
         $severitySummary = isset($data['severity_summary']) ? json_encode($data['severity_summary']) : null;
+        $findingsJson = isset($data['findings']) ? json_encode($data['findings']) : null;
 
         $stmt->execute([
             'repo_id'          => $data['repo_id'],
@@ -38,6 +44,7 @@ class ScanResult
             'finding_count'    => $data['finding_count'] ?? 0,
             'severity_summary' => $severitySummary,
             'artifact_url'     => $data['artifact_url'] ?? null,
+            'findings'         => $findingsJson,
         ]);
 
         return (int) $pdo->lastInsertId();

@@ -37,6 +37,21 @@ class ChatController
         ];
     }
 
+    public function getContext(array $params): array
+    {
+        $repoId = (int) ($params['repoId'] ?? 0);
+        if ($repoId <= 0) {
+            throw new RuntimeException("Invalid Repo ID", 400);
+        }
+
+        $context = $this->chatService->getRepoContext($repoId);
+
+        return [
+            'status' => 'success',
+            'data'   => $context,
+        ];
+    }
+
     public function requestFix(array $params): array
     {
         return $this->message($params);

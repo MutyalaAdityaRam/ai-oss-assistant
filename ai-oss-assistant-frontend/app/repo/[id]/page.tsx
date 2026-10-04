@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api, RepoItem, ScanResultItem, FixItem, SuggestionItem } from '@/lib/api';
+import { api, RepoItem, ScanResultItem, FixItem, SuggestionItem, FindingItem } from '@/lib/api';
 
 export default function RepoDetail() {
   const params = useParams();
@@ -133,11 +133,34 @@ export default function RepoDetail() {
   const { repo, scan_results, fixes } = data;
   const mergedFixes = fixes.filter(f => f.merge_status === 'merged_to_fork');
 
+  // Extract all individual findings across tools, with fallback to fixes
+  const allFindings: FindingItem[] = [];
+  scan_results.forEach(scan => {
+    if (scan.findings && Array.isArray(scan.findings)) {
+      scan.findings.forEach(f => allFindings.push(f));
+    }
+  });
+
+  // If scan_results has no nested findings array, construct from fixes so user always sees the detected bugs!
+  if (allFindings.length === 0 && fixes.length > 0) {
+    fixes.forEach(fix => {
+      allFindings.push({
+        tool: fix.source === 'user_chat_plan' ? 'ai-planner' : 'semgrep',
+        rule_id: 'remediated-vulnerability',
+        severity: fix.priority_tier === 'primary' ? 'HIGH' : 'LOW',
+        path: 'codebase',
+        line: 1,
+        msg: fix.issue_description,
+        explanation: fix.explanation,
+      });
+    });
+  }
+
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
         <a href="/" style={{ color: '#94a3b8', fontSize: '0.85rem' }}>← Back to Dashboard</a>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>{repo.full_name}</h2>
             <span className={`badge badge-${repo.status}`} style={{ marginTop: '8px' }}>
@@ -145,7 +168,23 @@ export default function RepoDetail() {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <a
+              href={`/chat/${repo.id}`}
+              className="btn btn-secondary"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                borderColor: '#3b82f6',
+                color: '#60a5fa',
+                fontWeight: 600,
+                padding: '8px 16px',
+                background: 'rgba(59, 130, 246, 0.1)',
+              }}
+            >
+              <span>💬</span> Chat & Plan Implementation
+            </a>
             <button onClick={handleApprovePr} className="btn btn-primary">Approve & Open PR</button>
             <button onClick={handleDeclinePr} className="btn btn-secondary">Decline PR</button>
           </div>
@@ -255,43 +294,109 @@ export default function RepoDetail() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
         {/* Scan Results Panel */}
         <div className="glass-panel" style={{ padding: '24px' }}>
-          <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Static Analysis & Security Scans</h3>
-          {scan_results.length === 0 ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Static Analysis & Security Scans</h3>
+            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+              {allFindings.length} Detected Issue{allFindings.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          {allFindings.length === 0 ? (
             <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No scan results recorded yet.</p>
           ) : (
-            <div style={{ display: 'grid', gap: '12px' }}>
-              {scan_results.map(scan => (
-                <div key={scan.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.85rem', color: '#06b6d4' }}>{scan.tool}</span>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Findings: {scan.finding_count}</div>
+            <div>
+              {/* Tool Summary Tags */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                {scan_results.map(scan => (
+                  <div key={scan.id} style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <span style={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.78rem', color: '#38bdf8' }}>{scan.tool}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>({scan.finding_count})</span>
+                    {scan.severity_summary && (
+                      <span style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>
+                        {scan.severity_summary.high} High
+                      </span>
+                    )}
                   </div>
-                  {scan.severity_summary && (
-                    <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem' }}>
-                      <span style={{ color: '#fca5a5' }}>H: {scan.severity_summary.high}</span>
-                      <span style={{ color: '#fde047' }}>M: {scan.severity_summary.medium}</span>
-                      <span style={{ color: '#93c5fd' }}>L: {scan.severity_summary.low}</span>
+                ))}
+              </div>
+
+              {/* Individual Detected Findings List */}
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {allFindings.map((finding, idx) => (
+                  <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: (finding.severity === 'CRITICAL' || finding.severity === 'HIGH') ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                          color: (finding.severity === 'CRITICAL' || finding.severity === 'HIGH') ? '#fca5a5' : '#fcd34d',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {finding.severity || 'HIGH'}
+                      </span>
+                      {finding.path && (
+                        <code style={{ fontSize: '0.75rem', color: '#93c5fd', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                          {finding.path}:{finding.line || 1}
+                        </code>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#f1f5f9', marginBottom: '4px', lineHeight: '1.4' }}>
+                      {finding.msg || finding.message || 'Identified security vulnerability'}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                        Tool: {finding.tool || 'scanner'} {finding.rule_id ? `• Rule: ${finding.rule_id}` : ''}
+                      </span>
+                      <a href={`/chat/${repo.id}`} style={{ fontSize: '0.78rem', color: '#60a5fa', textDecoration: 'none', fontWeight: 600 }}>
+                        Plan Fix with AI Chat →
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* Fixes Panel */}
         <div className="glass-panel" style={{ padding: '24px' }}>
-          <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Verified Fixes</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Verified Fixes</h3>
+            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+              {fixes.length} Automated Fix{fixes.length === 1 ? '' : 'es'}
+            </span>
+          </div>
+
           {fixes.length === 0 ? (
             <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No automated fixes generated for this repository.</p>
           ) : (
             <div style={{ display: 'grid', gap: '12px' }}>
               {fixes.map(fix => (
-                <div key={fix.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '6px' }}>{fix.issue_description}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                    <span style={{ color: fix.merge_status === 'merged_to_fork' ? '#6ee7b7' : '#fca5a5' }}>
-                      {fix.merge_status.replace('_', ' ')}
+                <div key={fix.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase',
+                        backgroundColor: fix.priority_tier === 'primary' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                        color: fix.priority_tier === 'primary' ? '#fca5a5' : '#93c5fd',
+                      }}
+                    >
+                      {fix.priority_tier || 'primary'}
+                    </span>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#f8fafc' }}>{fix.issue_description}</div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', marginTop: '10px' }}>
+                    <span style={{ color: fix.merge_status === 'merged_to_fork' ? '#6ee7b7' : '#fca5a5', fontWeight: 600 }}>
+                      ✓ {fix.merge_status.replace('_', ' ')}
                     </span>
                     <a href={`/fix/${fix.id}`} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
                       View Dashboard & Diff →
@@ -301,6 +406,81 @@ export default function RepoDetail() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Dedicated AI Implementation Planner & Chat Section for this opened repo */}
+      <div
+        className="glass-panel"
+        style={{
+          padding: '24px',
+          borderLeft: '4px solid #3b82f6',
+          background: 'rgba(59, 130, 246, 0.04)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#93c5fd', margin: 0 }}>
+              💡 AI Implementation Planner for {repo.full_name}
+            </h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+              The engineering chat bot is preloaded with {repo.full_name}&apos;s architecture, dependencies, and {allFindings.length} detected findings.
+            </p>
+          </div>
+
+          <a
+            href={`/chat/${repo.id}`}
+            className="btn btn-primary"
+            style={{ fontSize: '0.85rem', padding: '8px 18px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <span>💬</span> Open Full-Screen Chat Assistant →
+          </a>
+        </div>
+
+        {/* Quick Question Chips */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <a
+            href={`/chat/${repo.id}`}
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              color: '#cbd5e1',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '0.8rem',
+              textDecoration: 'none',
+            }}
+          >
+            🚀 &quot;Plan the implementation for the critical bug in {repo.full_name}&quot;
+          </a>
+          <a
+            href={`/chat/${repo.id}`}
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              color: '#cbd5e1',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '0.8rem',
+              textDecoration: 'none',
+            }}
+          >
+            🔍 &quot;Analyze root causes and files to modify&quot;
+          </a>
+          <a
+            href={`/chat/${repo.id}`}
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              color: '#cbd5e1',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '0.8rem',
+              textDecoration: 'none',
+            }}
+          >
+            🧪 &quot;Generate unit & regression test strategy&quot;
+          </a>
         </div>
       </div>
     </div>

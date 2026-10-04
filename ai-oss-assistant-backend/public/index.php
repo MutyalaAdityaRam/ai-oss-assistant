@@ -57,6 +57,7 @@ $router->get('/api/fixes/{fixId}/optimization', [OptimizationController::class, 
 $router->get('/public/fix/{fixId}', [FixController::class, 'getPublicFix'], false);
 
 // Chat Agent Endpoints
+$router->get('/api/chat/{repoId}/context', [ChatController::class, 'getContext']);
 $router->post('/api/chat/{repoId}', [ChatController::class, 'message']);
 $router->post('/api/chat/{repoId}/fix', [ChatController::class, 'requestFix']);
 

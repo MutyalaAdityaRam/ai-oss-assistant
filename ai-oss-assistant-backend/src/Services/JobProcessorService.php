@@ -22,8 +22,8 @@ class JobProcessorService
             throw new RuntimeException("Repo ID {$repoId} not found");
         }
 
-        // Idempotency check: only process if repo is currently in 'analyzing' or 'candidate' state
-        if (!in_array($repo['status'], ['analyzing', 'candidate'], true)) {
+        // Idempotency check: process if repo is in analyzing, candidate, bugs_found, or forked state
+        if (!in_array($repo['status'], ['analyzing', 'candidate', 'bugs_found', 'forked'], true)) {
             return [
                 'status'  => 'skipped',
                 'reason'  => "Repo state is already '{$repo['status']}', skipping duplicate execution",
@@ -33,14 +33,19 @@ class JobProcessorService
 
         $findings = $payload['findings'] ?? [];
         $findingCount = count($findings);
+        $tool = $payload['tool'] ?? 'semgrep';
+        if (!in_array($tool, ['semgrep','codeql','trivy','gitleaks','zap','newman'], true)) {
+            $tool = 'semgrep';
+        }
 
-        // Store compact summary in scan_results (NO raw scanner JSON in MySQL)
+        // Store compact summary and findings in scan_results
         ScanResult::create([
             'repo_id'          => $repoId,
-            'tool'             => $payload['tool'] ?? 'semgrep',
+            'tool'             => $tool,
             'finding_count'    => $findingCount,
             'severity_summary' => $payload['severity_summary'] ?? ['high' => 0, 'medium' => 0, 'low' => 0],
             'artifact_url'     => $payload['artifact_url'] ?? null,
+            'findings'         => $findings,
         ]);
 
         if ($findingCount === 0) {

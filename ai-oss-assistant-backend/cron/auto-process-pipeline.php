@@ -6,6 +6,7 @@ use AiOssAssistant\Config;
 use AiOssAssistant\Database;
 use AiOssAssistant\Models\Repo;
 use AiOssAssistant\Models\Fix;
+use AiOssAssistant\Models\ScanResult;
 use AiOssAssistant\Models\OptimizationResult;
 use AiOssAssistant\Services\GitHubService;
 use AiOssAssistant\Services\JobProcessorService;
@@ -150,21 +151,40 @@ try {
             // Log info
         }
 
-        // 3. Clear old scan results & insert CRITICAL findings list sorted by severity
+        // 3. Clear old scan results & insert CRITICAL findings breakdown by scanner tool
         $pdo->prepare("DELETE FROM scan_results WHERE repo_id = ?")->execute([$repoId]);
         
-        $criticalCount = count($meta['critical_bugs']);
-        $payload = [
-            'type'             => 'analysis',
-            'repo_id'          => $repoId,
-            'tool'             => 'merged',
-            'finding_count'    => $criticalCount,
-            'severity_summary' => ['high' => $criticalCount, 'medium' => 0, 'low' => 0],
-            'findings'         => $meta['critical_bugs'],
-        ];
+        $byTool = [];
+        foreach ($meta['critical_bugs'] as $bug) {
+            $t = strtolower($bug['tool'] ?? 'semgrep');
+            if (!in_array($t, ['semgrep','codeql','trivy','gitleaks','zap','newman'], true)) {
+                $t = 'semgrep';
+            }
+            $byTool[$t][] = $bug;
+        }
 
-        JobProcessorService::processAnalysisResult($repoId, $payload);
-        echo "  [✓] Recorded {$criticalCount} CRITICAL/HIGH Severity Vulnerabilities in scan_results\n";
+        $totalRecorded = 0;
+        foreach ($byTool as $toolName => $toolFindings) {
+            $hCount = 0; $mCount = 0; $lCount = 0;
+            foreach ($toolFindings as $tf) {
+                $sev = strtoupper($tf['severity'] ?? 'HIGH');
+                if (in_array($sev, ['CRITICAL', 'HIGH'])) $hCount++;
+                elseif ($sev === 'MEDIUM') $mCount++;
+                else $lCount++;
+            }
+            ScanResult::create([
+                'repo_id'          => $repoId,
+                'tool'             => $toolName,
+                'finding_count'    => count($toolFindings),
+                'severity_summary' => ['high' => $hCount, 'medium' => $mCount, 'low' => $lCount],
+                'artifact_url'     => "https://github.com/{$user}/ai-oss-assistant/actions",
+                'findings'         => $toolFindings,
+            ]);
+            $totalRecorded += count($toolFindings);
+        }
+
+        Repo::updateStatus($repoId, 'bugs_found');
+        echo "  [✓] Recorded {$totalRecorded} findings across " . count($byTool) . " scanner tools in scan_results\n";
 
         // 4. Create repository-specific fixes using multi-finding triage pipeline (Addendum §1 & §2)
         $pdo->prepare("DELETE FROM fixes WHERE repo_id = ?")->execute([$repoId]);
