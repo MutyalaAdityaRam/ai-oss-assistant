@@ -11,14 +11,23 @@ class AutomationControlServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        try {
+            Database::getConnection();
+        } catch (\Throwable $e) {
+            $this->markTestSkipped('Database connection offline');
+        }
         // Reset to active before each test
         AutomationControlService::resume();
     }
 
     protected function tearDown(): void
     {
-        // Reset to active after tests
-        AutomationControlService::resume();
+        try {
+            // Reset to active after tests
+            AutomationControlService::resume();
+        } catch (\Throwable $e) {
+            // Ignore if DB offline
+        }
         parent::tearDown();
     }
 

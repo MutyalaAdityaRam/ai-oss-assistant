@@ -22,13 +22,23 @@ class AutomationEndpointTest extends TestCase
         $this->router->post('/api/automation/resume', [AutomationController::class, 'resume']);
         $this->router->post('/api/automation/run-once', [AutomationController::class, 'runOnce']);
 
+        try {
+            \AiOssAssistant\Database::getConnection();
+        } catch (\Throwable $e) {
+            $this->markTestSkipped('Database connection offline');
+        }
+
         // Reset to active state before tests
         AutomationControlService::resume();
     }
 
     protected function tearDown(): void
     {
-        AutomationControlService::resume();
+        try {
+            AutomationControlService::resume();
+        } catch (\Throwable $e) {
+            // Ignore if offline
+        }
         parent::tearDown();
     }
 

@@ -36,6 +36,7 @@ class AcceptanceEndpointTest extends TestCase
 
         // Seed test repo & fix in database if MySQL is online
         try {
+            Database::getConnection();
             $this->repoId = Repo::create([
                 'full_name'    => 'octocat/Hello-World-' . rand(100, 999),
                 'stars'        => 500,
@@ -54,8 +55,7 @@ class AcceptanceEndpointTest extends TestCase
                 'merge_status'      => 'merged_to_fork',
             ]);
         } catch (\Throwable $e) {
-            $this->repoId = 1;
-            $this->fixId = 1;
+            $this->markTestSkipped('Database connection offline: ' . $e->getMessage());
         }
     }
 

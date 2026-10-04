@@ -18,6 +18,12 @@ class MultiFindingTriagePipelineTest extends TestCase
     {
         parent::setUp();
 
+        try {
+            Database::getConnection();
+        } catch (\Throwable $e) {
+            $this->markTestSkipped('Database connection offline');
+        }
+
         $this->repoId = Repo::create([
             'full_name'    => 'test-org/multi-finding-test-' . rand(1000, 9999),
             'stars'        => 750,

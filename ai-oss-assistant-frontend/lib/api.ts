@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost/AI/ai-oss-assistant-backend/public';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://ai-oss-assistant.alwaysdata.net';
 const FALLBACK_API_URL = 'https://ai-oss-assistant.alwaysdata.net';
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || 'dev_secret_token_12345';
 
@@ -9,10 +9,14 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     ...(options.headers || {}),
   };
 
+  const isAiRequest = endpoint.includes('/chat') || endpoint.includes('/suggestions');
+  const timeoutMs = isAiRequest ? 60000 : 15000;
+
   // Try primary URL first
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const primaryTimeoutMs = API_BASE_URL.includes('localhost') ? 2500 : timeoutMs;
+    const timeoutId = setTimeout(() => controller.abort(), primaryTimeoutMs);
     const primaryUrl = `${API_BASE_URL}${endpoint}`;
     const response = await fetch(primaryUrl, { ...options, headers, signal: controller.signal });
     clearTimeout(timeoutId);
@@ -20,15 +24,21 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     if (response.ok) {
       return await response.json();
     }
-  } catch (err) {
-    // If primary failed and it's different from fallback, try live Alwaysdata backend
+    const errJson = await response.json().catch(() => ({}));
+    if (response.status >= 400 && response.status < 500) {
+      throw new Error(errJson.error || `Request failed with status ${response.status}`);
+    }
+  } catch (err: any) {
+    if (err.message && !err.message.includes('fetch') && !err.message.includes('abort') && !err.message.includes('connect')) {
+      throw err;
+    }
   }
 
-  // Attempt fallback if primary failed or returned error
+  // Attempt fallback if primary failed (e.g. localhost down)
   if (API_BASE_URL !== FALLBACK_API_URL) {
     try {
       const fallbackController = new AbortController();
-      const fallbackTimeout = setTimeout(() => fallbackController.abort(), 6000);
+      const fallbackTimeout = setTimeout(() => fallbackController.abort(), timeoutMs);
       const fallbackUrl = `${FALLBACK_API_URL}${endpoint}`;
       const fallbackResponse = await fetch(fallbackUrl, { ...options, headers, signal: fallbackController.signal });
       clearTimeout(fallbackTimeout);
@@ -39,6 +49,9 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
       const errJson = await fallbackResponse.json().catch(() => ({}));
       throw new Error(errJson.error || `API Request failed with status ${fallbackResponse.status}`);
     } catch (fallbackErr: any) {
+      if (fallbackErr.name === 'AbortError') {
+        throw new Error('AI request timed out. Please try again.');
+      }
       throw fallbackErr;
     }
   }

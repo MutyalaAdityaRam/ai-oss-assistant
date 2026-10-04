@@ -201,7 +201,11 @@ class FileClassificationAndScopingTest extends TestCase
 
     public function testPublicFixViewAccessControlOnlyAllowsOpenOrMergedPRs(): void
     {
-        $pdo = Database::getConnection();
+        try {
+            $pdo = Database::getConnection();
+        } catch (\Throwable $e) {
+            $this->markTestSkipped('Database connection offline');
+        }
 
         // Create test repo with isolated name
         $repoId = Repo::create([
