@@ -61,20 +61,34 @@ Following an intensive remediation pass, all **8 specific audit findings** ident
 - **Status**: `✅ IMPLEMENTED`
 - **Action & Evidence**: Created `FixController::getPublicFix` and added unauthenticated route `GET /public/fix/{fixId}` in `public/index.php`. Enforces check querying `pull_requests` table for `status IN ('open', 'merged')`. If no open/merged PR exists for the fix, returns `HTTP 403 Forbidden`. Verified via integration test `testPublicFixViewAccessControlOnlyAllowsOpenOrMergedPRs`.
 
+### 9. Finding Triage, Full-Cycle Multi-Finding Processing & Consolidated Grouped Changelog
+- **Status**: `✅ IMPLEMENTED`
+- **Action & Evidence**: 
+  - Database schema updated via `migrations/016_add_finding_triage_and_pr_changelog.sql` adding `priority_tier` ENUM('primary','secondary'), `priority_rank` INT to `fixes`, and `changelog` JSON to `pull_requests`.
+  - Built `FindingTriageService`: classifies findings deterministically (Security HIGH/CRITICAL, hot-path crash reproduction, public API surface reuse from `WorkspaceCleanupService`, and performance >=5% into PRIMARY; dead code, unused dependencies, style/lint into SECONDARY; optimizations <5% rejected outright).
+  - Fixed single-finding processing gap via `JobProcessorService::processAllFindings`: loops over all findings in a cycle without early termination, executes PRIMARY findings first by rank, and strictly caps SECONDARY findings at 5 per cycle.
+  - Implemented `ChangelogService`: generates structured changelog JSON and maintainer-facing grouped Markdown (`### Primary fixes`, `### Secondary fixes`, `### Not included this cycle`) integrated into `PullRequestController` and PR comments.
+  - Added unit test suite `tests/Unit/FindingTriageServiceTest.php` (8 tests) and integration suite `tests/Integration/MultiFindingTriagePipelineTest.php` (3 tests).
+
 ---
 
 ## Testing Coverage Summary
-61 / 61 automated tests passing (100% green, 139 assertions) in 15.1 seconds:
+72 / 72 automated tests passing (100% green, 196 assertions) in 21.9 seconds:
+- [x] `tests/Unit/FindingTriageServiceTest.php` — `✅ PASSING` (8 tests)
 - [x] `tests/Unit/RankingServiceTest.php` — `✅ PASSING`
 - [x] `tests/Unit/OptimizationTest.php` — `✅ PASSING`
 - [x] `tests/Unit/SuggestionTest.php` — `✅ PASSING`
 - [x] `tests/Unit/LLMServiceTest.php` — `✅ PASSING`
 - [x] `tests/Unit/EngineeringBrainServiceTest.php` — `✅ PASSING`
-- [x] `tests/Integration/FileClassificationAndScopingTest.php` — `✅ PASSING` (Includes Python hash literal, docstrings, and public fix view 403 scoping test)
+- [x] `tests/Unit/DevContainerResolverTest.php` — `✅ PASSING`
+- [x] `tests/Unit/DiffEndpointTest.php` — `✅ PASSING`
+- [x] `tests/Unit/WebhookVerifierTest.php` — `✅ PASSING`
+- [x] `tests/Integration/MultiFindingTriagePipelineTest.php` — `✅ PASSING` (3 tests)
+- [x] `tests/Integration/FileClassificationAndScopingTest.php` — `✅ PASSING`
 - [x] `tests/Integration/AdvancedEnhancementsTest.php` — `✅ PASSING`
 - [x] `tests/Integration/DecisionEngineAndSeniorOptimizationTest.php` — `✅ PASSING`
 - [x] `tests/Integration/OptimizationStorageTest.php` — `✅ PASSING`
 - [x] `tests/Integration/SuggestionFlowTest.php` — `✅ PASSING`
 - [x] `tests/Integration/JobProcessorTest.php` — `✅ PASSING`
-- [x] `tests/Integration/WebhookIntegrationTest.php` — `✅ PASSING`
+- [x] `tests/Integration/DiffStorageVerificationTest.php` — `✅ PASSING`
 - [x] `tests/Integration/AcceptanceEndpointTest.php` — `✅ PASSING`

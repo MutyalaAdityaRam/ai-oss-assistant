@@ -74,11 +74,17 @@ jobs:
       - name: HMAC Sign and Webhook POST back to Backend
         working-directory: target
         env:
-          WEBHOOK_SECRET: ${{ secrets.BACKEND_WEBHOOK_SECRET }}
-          WEBHOOK_URL: ${{ secrets.BACKEND_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.BACKEND_WEBHOOK_SECRET || 'webhook_secret_key_12345' }}
+          WEBHOOK_URL: ${{ secrets.BACKEND_WEBHOOK_URL || 'https://ai-oss-assistant.alwaysdata.net/public/webhooks/github.php' }}
         run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            WEBHOOK_URL="https://ai-oss-assistant.alwaysdata.net/public/webhooks/github.php"
+          fi
+          if [ -z "$WEBHOOK_SECRET" ]; then
+            WEBHOOK_SECRET="webhook_secret_key_12345"
+          fi
           SIG=$(openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" merged-findings.json | awk '{print $2}')
-          curl -X POST "$WEBHOOK_URL" \
+          curl -f -s -S -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -H "X-Hub-Signature-256: sha256=$SIG" \
-            -d @merged-findings.json
+            -d @merged-findings.json || echo "Webhook delivery finished with code $?"

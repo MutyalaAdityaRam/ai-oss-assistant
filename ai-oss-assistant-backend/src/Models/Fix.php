@@ -31,8 +31,8 @@ class Fix
     {
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare("
-            INSERT INTO fixes (repo_id, issue_description, branch_id, base_sha, head_sha, explanation, test_status, security_status, retry_count, merge_status, source, decision_options, critic_notes)
-            VALUES (:repo_id, :issue_description, :branch_id, :base_sha, :head_sha, :explanation, :test_status, :security_status, :retry_count, :merge_status, :source, :decision_options, :critic_notes)
+            INSERT INTO fixes (repo_id, issue_description, branch_id, base_sha, head_sha, explanation, test_status, security_status, retry_count, merge_status, source, decision_options, critic_notes, priority_tier, priority_rank)
+            VALUES (:repo_id, :issue_description, :branch_id, :base_sha, :head_sha, :explanation, :test_status, :security_status, :retry_count, :merge_status, :source, :decision_options, :critic_notes, :priority_tier, :priority_rank)
         ");
 
         $stmt->execute([
@@ -49,6 +49,8 @@ class Fix
             'source'            => $data['source'] ?? 'automated',
             'decision_options' => $data['decision_options'] ?? null,
             'critic_notes'     => $data['critic_notes'] ?? null,
+            'priority_tier'     => $data['priority_tier'] ?? 'primary',
+            'priority_rank'     => $data['priority_rank'] ?? 999,
         ]);
 
         return (int) $pdo->lastInsertId();
@@ -60,7 +62,7 @@ class Fix
         $fields = [];
         $params = [];
 
-        foreach (['base_sha', 'head_sha', 'explanation', 'test_status', 'security_status', 'retry_count', 'merge_status', 'decision_options', 'critic_notes'] as $key) {
+        foreach (['base_sha', 'head_sha', 'explanation', 'test_status', 'security_status', 'retry_count', 'merge_status', 'decision_options', 'critic_notes', 'priority_tier', 'priority_rank'] as $key) {
             if (array_key_exists($key, $data)) {
                 $fields[] = "{$key} = :{$key}";
                 $params[$key] = $data[$key];

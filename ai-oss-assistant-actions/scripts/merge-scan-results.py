@@ -24,23 +24,48 @@ def main():
     findings = []
     severity_summary = {'high': 0, 'medium': 0, 'low': 0}
 
+    # Process Trivy CVE findings
+    if trivy_data and 'Results' in trivy_data:
+        for target in trivy_data['Results']:
+            for vuln in target.get('Vulnerabilities', []):
+                sev = vuln.get('Severity', 'MEDIUM').lower()
+                if 'critical' in sev or 'high' in sev:
+                    severity_summary['high'] += 1
+                elif 'medium' in sev:
+                    severity_summary['medium'] += 1
+                else:
+                    severity_summary['low'] += 1
+
+                findings.append({
+                    'tool': 'trivy',
+                    'rule_id': vuln.get('VulnerabilityID', 'CVE'),
+                    'severity': 'HIGH' if 'critical' in sev or 'high' in sev else ('MEDIUM' if 'medium' in sev else 'LOW'),
+                    'path': target.get('Target', 'package.json'),
+                    'line': 1,
+                    'message': f"Critical Vulnerability: {vuln.get('Title', 'CVE Security Vulnerability')}"
+                })
+
     # Process Semgrep
     if semgrep_data and 'results' in semgrep_data:
         for res in semgrep_data['results']:
             sev = res.get('extra', {}).get('severity', 'WARNING').lower()
+            sev_level = 'LOW'
             if 'error' in sev or 'high' in sev:
                 severity_summary['high'] += 1
+                sev_level = 'HIGH'
             elif 'warning' in sev or 'medium' in sev:
                 severity_summary['medium'] += 1
+                sev_level = 'MEDIUM'
             else:
                 severity_summary['low'] += 1
 
             findings.append({
                 'tool': 'semgrep',
                 'rule_id': res.get('check_id'),
+                'severity': sev_level,
                 'path': res.get('path'),
                 'line': res.get('line', res.get('start', {}).get('line')),
-                'message': res.get('extra', {}).get('message', 'Semgrep finding')
+                'message': res.get('extra', {}).get('message', 'Semgrep security finding')
             })
 
     # Process Gitleaks
@@ -50,10 +75,15 @@ def main():
             findings.append({
                 'tool': 'gitleaks',
                 'rule_id': leak.get('RuleID'),
+                'severity': 'HIGH',
                 'path': leak.get('File'),
                 'line': leak.get('StartLine'),
-                'message': f"Leaked Secret: {leak.get('Description')}"
+                'message': f"Critical Secret Leak: {leak.get('Description')}"
             })
+
+    # Sort findings strictly by Severity (HIGH > MEDIUM > LOW) so critical bugs are primary
+    sev_rank = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    findings.sort(key=lambda x: sev_rank.get(x.get('severity', 'LOW'), 2))
 
     compact_payload = {
         'type': 'analysis',
